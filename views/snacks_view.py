@@ -2,10 +2,10 @@ import customtkinter as ctk
 
 
 DEFAULT_SNACKS = [
-    {"id": "SN01", "name": "Bắp rang bơ (Lớn)", "price": 55000},
-    {"id": "SN02", "name": "Bắp phô mai (Vừa)", "price": 49000},
-    {"id": "SN03", "name": "Pepsi tươi (Lớn)", "price": 35000},
-    {"id": "SN04", "name": "Combo Đôi (1 Bắp + 2 Nước)", "price": 99000},
+    {"id": "SN01", "name": "Butter Popcorn (Large)", "price": 55000},
+    {"id": "SN02", "name": "Cheese Popcorn (Medium)", "price": 49000},
+    {"id": "SN03", "name": "Fresh Pepsi (Large)", "price": 35000},
+    {"id": "SN04", "name": "Couple Combo (1 Popcorn + 2 Drinks)", "price": 99000},
 ]
 
 
@@ -18,15 +18,15 @@ class SnacksView(ctk.CTkToplevel):
             item["id"]: int((initial_quantities or {}).get(item["id"], 0))
             for item in DEFAULT_SNACKS
         }
-        self.qty_labels = {}
+        self.qty_labels: dict[str, ctk.CTkLabel] = {}
 
-        self.title("Chọn bắp nước")
+        self.title("Select Snacks & Drinks")
         self.geometry("540x430")
         self.grab_set()
 
         ctk.CTkLabel(
             self,
-            text="MENU BẮP NƯỚC",
+            text="SNACKS & DRINKS MENU",
             font=("Arial", 20, "bold"),
         ).pack(pady=(18, 12))
 
@@ -74,13 +74,13 @@ class SnacksView(ctk.CTkToplevel):
                 command=lambda sid=item["id"]: self.change_qty(sid, 1),
             ).pack(side="left", padx=4)
 
-        self.total_label = ctk.CTkLabel(
+        self.lbl_total = ctk.CTkLabel(
             self,
-            text="Tiền bắp nước: 0đ",
+            text="Snacks Total: 0đ",
             font=("Arial", 15, "bold"),
             text_color="#22c55e",
         )
-        self.total_label.pack(pady=(10, 6))
+        self.lbl_total.pack(pady=(10, 6))
         self.refresh_total()
 
         action_row = ctk.CTkFrame(self, fg_color="transparent")
@@ -88,7 +88,7 @@ class SnacksView(ctk.CTkToplevel):
 
         ctk.CTkButton(
             action_row,
-            text="← Trở về",
+            text="← Back",
             width=120,
             height=38,
             font=("Arial", 13, "bold"),
@@ -99,7 +99,7 @@ class SnacksView(ctk.CTkToplevel):
 
         ctk.CTkButton(
             action_row,
-            text="Xác nhận bắp nước",
+            text="Confirm Snacks",
             width=185,
             height=38,
             font=("Arial", 14, "bold"),
@@ -108,24 +108,21 @@ class SnacksView(ctk.CTkToplevel):
             command=self.confirm,
         ).pack(side="left", padx=6)
 
-    def change_qty(self, snack_id, delta):
+    def change_qty(self, snack_id: str, delta: int) -> None:
         new_val = max(0, self.quantities[snack_id] + delta)
         self.quantities[snack_id] = new_val
         self.qty_labels[snack_id].configure(text=str(new_val))
         self.refresh_total()
 
-    def calc_total(self):
-        total = 0
-        for item in DEFAULT_SNACKS:
-            total += item["price"] * self.quantities[item["id"]]
-        return total
+    def calc_total(self) -> int:
+        return sum(item["price"] * self.quantities[item["id"]] for item in DEFAULT_SNACKS)
 
-    def refresh_total(self):
+    def refresh_total(self) -> None:
         total = self.calc_total()
         formatted = f"{total:,}đ".replace(",", ".")
-        self.total_label.configure(text=f"Tiền bắp nước: {formatted}")
+        self.lbl_total.configure(text=f"Snacks Total: {formatted}")
 
-    def go_back(self):
+    def go_back(self) -> None:
         callback = self.on_back
         try:
             self.grab_release()
@@ -135,7 +132,7 @@ class SnacksView(ctk.CTkToplevel):
         if callback:
             self.master.after(50, callback)
 
-    def confirm(self):
+    def confirm(self) -> None:
         chosen = [
             {
                 "id": item["id"],

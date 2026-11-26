@@ -2,16 +2,18 @@ from datetime import datetime
 import customtkinter as ctk
 import qrcode
 
+from data.models import Showtime
+
 TICKET_PRICE = 75000
 
 PROMO_CODES = {
-    "SINHVIEN": {"type": "percent", "value": 15, "desc": "Giảm 15% tổng đơn"},
-    "GIAM20K": {"type": "fixed", "value": 20000, "desc": "Giảm thẳng 20.000đ"},
-    "RAPPHIM50": {"type": "fixed", "value": 50000, "desc": "Giảm thẳng 50.000đ"},
+    "SINHVIEN": {"type": "percent", "value": 15, "desc": "15% off total order"},
+    "GIAM20K": {"type": "fixed", "value": 20000, "desc": "20.000đ off"},
+    "RAPPHIM50": {"type": "fixed", "value": 50000, "desc": "50.000đ off"},
 }
 
 
-def fmt_vnd(amount):
+def fmt_vnd(amount: int | float) -> str:
     return f"{int(amount):,}đ".replace(",", ".")
 
 
@@ -19,15 +21,15 @@ class CheckoutView(ctk.CTkToplevel):
     def __init__(
         self,
         parent,
-        suat_chieu,
+        showtime: Showtime,
         selected_seats,
         selected_snacks,
-        snack_total,
+        snack_total: int,
         on_paid=None,
         on_back=None,
     ):
         super().__init__(parent)
-        self.suat_chieu = suat_chieu
+        self.showtime = showtime
         self.selected_seats = sorted(list(selected_seats))
         self.selected_snacks = selected_snacks
         self.snack_total = snack_total
@@ -39,13 +41,13 @@ class CheckoutView(ctk.CTkToplevel):
         self.applied_code = ""
         self.qr_ctk_image = None
 
-        self.title("Thanh toán & Xuất vé QR")
+        self.title("Checkout & Ticket QR")
         self.geometry("560x670")
         self.grab_set()
 
         ctk.CTkLabel(
             self,
-            text="XÁC NHẬN ĐẶT VÉ & THANH TOÁN",
+            text="BOOKING CONFIRMATION & PAYMENT",
             font=("Arial", 19, "bold"),
         ).pack(pady=(16, 10))
 
@@ -55,14 +57,14 @@ class CheckoutView(ctk.CTkToplevel):
         snacks_text = (
             ", ".join(f"{s['name']} x{s['qty']}" for s in self.selected_snacks)
             if self.selected_snacks
-            else "Không chọn"
+            else "None"
         )
 
         details = (
-            f"Phim: {suat_chieu.phim.ten_phim}\n"
-            f"Suất: {suat_chieu.phong.ten_phong}  |  {suat_chieu.gio_chieu}\n"
-            f"Ghế ({len(self.selected_seats)}): {', '.join(self.selected_seats)}\n"
-            f"Bắp nước: {snacks_text}"
+            f"Movie: {showtime.movie.title}\n"
+            f"Showtime: {showtime.room.name}  |  {showtime.start_time}\n"
+            f"Seats ({len(self.selected_seats)}): {', '.join(self.selected_seats)}\n"
+            f"Snacks: {snacks_text}"
         )
         ctk.CTkLabel(
             info_box,
@@ -74,47 +76,47 @@ class CheckoutView(ctk.CTkToplevel):
         promo_frame = ctk.CTkFrame(self, fg_color="transparent")
         promo_frame.pack(fill="x", padx=25, pady=(8, 2))
 
-        self.promo_entry = ctk.CTkEntry(
+        self.entry_promo = ctk.CTkEntry(
             promo_frame,
-            placeholder_text="Nhập mã giảm giá (VD: SINHVIEN, GIAM20K)",
+            placeholder_text="Promo code (e.g. SINHVIEN, GIAM20K)",
             height=36,
         )
-        self.promo_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.entry_promo.pack(side="left", fill="x", expand=True, padx=(0, 8))
 
         ctk.CTkButton(
             promo_frame,
-            text="Áp dụng",
+            text="Apply",
             width=100,
             height=36,
             command=self.apply_promo,
         ).pack(side="right")
 
-        self.promo_msg = ctk.CTkLabel(
+        self.lbl_promo_msg = ctk.CTkLabel(
             self,
-            text="Mã gợi ý: SINHVIEN (-15%), GIAM20K (-20.000đ)",
+            text="Suggested codes: SINHVIEN (-15%), GIAM20K (-20.000đ)",
             font=("Arial", 12),
             text_color="#94a3b8",
         )
-        self.promo_msg.pack(anchor="w", padx=28, pady=(2, 8))
+        self.lbl_promo_msg.pack(anchor="w", padx=28, pady=(2, 8))
 
         price_box = ctk.CTkFrame(self)
         price_box.pack(fill="x", padx=25, pady=6)
 
-        self.price_label = ctk.CTkLabel(
+        self.lbl_price = ctk.CTkLabel(
             price_box,
             text="",
             font=("Arial", 14),
             justify="left",
         )
-        self.price_label.pack(anchor="w", padx=15, pady=10)
+        self.lbl_price.pack(anchor="w", padx=15, pady=10)
         self.refresh_summary()
 
         pay_row = ctk.CTkFrame(self, fg_color="transparent")
         pay_row.pack(pady=(10, 8))
 
-        self.back_btn = ctk.CTkButton(
+        self.btn_back = ctk.CTkButton(
             pay_row,
-            text="← Trở về",
+            text="← Back",
             width=120,
             height=40,
             font=("Arial", 13, "bold"),
@@ -122,11 +124,11 @@ class CheckoutView(ctk.CTkToplevel):
             hover_color="#334155",
             command=self.go_back,
         )
-        self.back_btn.pack(side="left", padx=6)
+        self.btn_back.pack(side="left", padx=6)
 
-        self.pay_btn = ctk.CTkButton(
+        self.btn_pay = ctk.CTkButton(
             pay_row,
-            text="Thanh toán & Xuất mã QR",
+            text="Pay & Generate QR",
             width=210,
             height=40,
             font=("Arial", 14, "bold"),
@@ -134,33 +136,33 @@ class CheckoutView(ctk.CTkToplevel):
             hover_color="#15803d",
             command=self.confirm_payment,
         )
-        self.pay_btn.pack(side="left", padx=6)
+        self.btn_pay.pack(side="left", padx=6)
 
         self.qr_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.qr_frame.pack(pady=6)
 
-    def calc_final_total(self):
+    def calc_final_total(self) -> int:
         subtotal = self.ticket_total + self.snack_total
         return max(0, subtotal - self.discount_amount)
 
-    def refresh_summary(self):
+    def refresh_summary(self) -> None:
         subtotal = self.ticket_total + self.snack_total
         final_total = self.calc_final_total()
         text = (
-            f"Tiền vé ({len(self.selected_seats)} x {fmt_vnd(TICKET_PRICE)}): {fmt_vnd(self.ticket_total)}\n"
-            f"Tiền bắp nước: {fmt_vnd(self.snack_total)}\n"
-            f"Tạm tính: {fmt_vnd(subtotal)}\n"
-            f"Giảm giá: -{fmt_vnd(self.discount_amount)}\n"
-            f"TỔNG THANH TOÁN: {fmt_vnd(final_total)}"
+            f"Tickets ({len(self.selected_seats)} x {fmt_vnd(TICKET_PRICE)}): {fmt_vnd(self.ticket_total)}\n"
+            f"Snacks: {fmt_vnd(self.snack_total)}\n"
+            f"Subtotal: {fmt_vnd(subtotal)}\n"
+            f"Discount: -{fmt_vnd(self.discount_amount)}\n"
+            f"TOTAL AMOUNT: {fmt_vnd(final_total)}"
         )
-        self.price_label.configure(text=text)
+        self.lbl_price.configure(text=text)
 
-    def apply_promo(self):
-        code = self.promo_entry.get().strip().upper()
+    def apply_promo(self) -> None:
+        code = self.entry_promo.get().strip().upper()
         if not code:
             self.discount_amount = 0
             self.applied_code = ""
-            self.promo_msg.configure(text="Vui lòng nhập mã giảm giá.", text_color="#facc15")
+            self.lbl_promo_msg.configure(text="Please enter a promo code.", text_color="#facc15")
             self.refresh_summary()
             return
 
@@ -168,7 +170,7 @@ class CheckoutView(ctk.CTkToplevel):
         if not promo:
             self.discount_amount = 0
             self.applied_code = ""
-            self.promo_msg.configure(text="Mã giảm giá không hợp lệ!", text_color="#ef4444")
+            self.lbl_promo_msg.configure(text="Invalid promo code!", text_color="#ef4444")
             self.refresh_summary()
             return
 
@@ -179,13 +181,13 @@ class CheckoutView(ctk.CTkToplevel):
             self.discount_amount = min(subtotal, promo["value"])
 
         self.applied_code = code
-        self.promo_msg.configure(
-            text=f"Đã áp dụng mã {code}: {promo['desc']}",
+        self.lbl_promo_msg.configure(
+            text=f"Applied {code}: {promo['desc']}",
             text_color="#22c55e",
         )
         self.refresh_summary()
 
-    def go_back(self):
+    def go_back(self) -> None:
         callback = self.on_back
         try:
             self.grab_release()
@@ -195,50 +197,51 @@ class CheckoutView(ctk.CTkToplevel):
         if callback:
             self.master.after(50, callback)
 
-    def confirm_payment(self):
-        trung = set(self.selected_seats) & self.suat_chieu.ds_ghe_dadat
-        if trung:
-            self.promo_msg.configure(
-                text=f"Ghế {', '.join(sorted(trung))} vừa có người đặt mất rồi!",
+    def confirm_payment(self) -> None:
+        conflict_seats = set(self.selected_seats) & self.showtime.booked_seats
+        if conflict_seats:
+            self.lbl_promo_msg.configure(
+                text=f"Seats {', '.join(sorted(conflict_seats))} were just booked!",
                 text_color="#ef4444",
             )
             return
 
-        self.suat_chieu.ds_ghe_dadat.update(self.selected_seats)
+        self.showtime.booked_seats.update(self.selected_seats)
 
-        ma_hd = "HD" + datetime.now().strftime("%Y%m%d%H%M%S")
+        invoice_id = "INV" + datetime.now().strftime("%Y%m%d%H%M%S")
+        final_total = self.calc_final_total()
         invoice = {
-            "ma_hoa_don": ma_hd,
-            "thoi_gian": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "ma_suat": self.suat_chieu.ma_suat,
-            "ten_phim": self.suat_chieu.phim.ten_phim,
-            "phong": self.suat_chieu.phong.ten_phong,
-            "gio_chieu": self.suat_chieu.gio_chieu,
-            "ghe": self.selected_seats,
-            "bap_nuoc": self.selected_snacks,
-            "ma_giam_gia": self.applied_code,
-            "giam_gia": self.discount_amount,
-            "tong_tien": self.calc_final_total(),
+            "invoice_id": invoice_id,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "showtime_id": self.showtime.showtime_id,
+            "movie_title": self.showtime.movie.title,
+            "room_name": self.showtime.room.name,
+            "start_time": self.showtime.start_time,
+            "seats": self.selected_seats,
+            "snacks": self.selected_snacks,
+            "promo_code": self.applied_code,
+            "discount": self.discount_amount,
+            "total_amount": final_total,
         }
 
         if self.on_paid:
             self.on_paid(invoice)
 
-        self.pay_btn.configure(state="disabled", text="Đã thanh toán thành công")
-        self.back_btn.configure(state="disabled")
-        self.promo_entry.configure(state="disabled")
+        self.btn_pay.configure(state="disabled", text="Paid Successfully")
+        self.btn_back.configure(state="disabled")
+        self.entry_promo.configure(state="disabled")
         self.show_qr(invoice)
 
-    def show_qr(self, invoice):
-        for w in self.qr_frame.winfo_children():
-            w.destroy()
+    def show_qr(self, invoice: dict) -> None:
+        for widget in self.qr_frame.winfo_children():
+            widget.destroy()
 
         qr_payload = (
-            f"MA VE: {invoice['ma_hoa_don']} | "
-            f"PHIM: {invoice['ten_phim']} | "
-            f"SUAT: {invoice['gio_chieu']} ({invoice['phong']}) | "
-            f"GHE: {', '.join(invoice['ghe'])} | "
-            f"TONG: {fmt_vnd(invoice['tong_tien'])}"
+            f"INVOICE: {invoice['invoice_id']} | "
+            f"MOVIE: {invoice['movie_title']} | "
+            f"TIME: {invoice['start_time']} ({invoice['room_name']}) | "
+            f"SEATS: {', '.join(invoice['seats'])} | "
+            f"TOTAL: {fmt_vnd(invoice['total_amount'])}"
         )
 
         qr_img = qrcode.make(qr_payload).get_image().convert("RGB")
@@ -246,7 +249,7 @@ class CheckoutView(ctk.CTkToplevel):
 
         ctk.CTkLabel(
             self.qr_frame,
-            text=f"Mã hóa đơn: {invoice['ma_hoa_don']} — Quét QR tại quầy soát vé",
+            text=f"Invoice: {invoice['invoice_id']} — Scan QR at ticket gate",
             font=("Arial", 12, "bold"),
             text_color="#38bdf8",
         ).pack(pady=(2, 6))
